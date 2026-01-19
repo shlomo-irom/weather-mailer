@@ -133,7 +133,6 @@ function pickBadge(desc, tempNow) {
   if (d.includes("שמש") || d.includes("sun")) return "יש שמש ☀️";
   return "עדכון יומי";
 }
-}
 
 // אם תרצה “יפה” יותר (מינ/מקס/רוח/גשם), אחרי שתריץ פעם אחת ותדביק לי דוגמת JSON,
 // נסדר parsing מדויק לשדות.
