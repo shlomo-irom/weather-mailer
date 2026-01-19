@@ -1,0 +1,14 @@
+[
+  {
+    "email": "A0583288809@GMAIL.COM",
+    "cityName": "Jerusalem",
+    "nowUrl": "https://www.02ws.co.il/api/now/0/1/C/1",
+    "forecastUrl": "https://www.02ws.co.il/api/forecast/1/1/C/1"
+  },
+  {
+    "email": "FEIG6465@GMAIL.COM",
+    "cityName": "Jerusalem",
+    "nowUrl": "https://www.02ws.co.il/api/now/0/1/C/1",
+    "forecastUrl": "https://www.02ws.co.il/api/forecast/2/1/C/1"
+  }
+]
