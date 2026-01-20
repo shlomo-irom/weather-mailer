@@ -5,10 +5,13 @@ async function fetchJson(url) {
   const res = await fetch(url, { headers: { accept: "application/json" } });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(`Fetch failed ${res.status} ${res.statusText}: ${text.slice(0, 200)}`);
+    throw new Error(
+      `Fetch failed ${res.status} ${res.statusText}: ${text.slice(0, 200)}`
+    );
   }
   return res.json();
 }
+
 function mergeKeyValueArray(arr) {
   // קולט: [ {time:"..."},{temp:4.7},{hum:"80"} ... ]
   // מחזיר: { time:"...", temp:4.7, hum:"80", ... }
@@ -24,16 +27,77 @@ function mergeKeyValueArray(arr) {
 }
 
 function n(v, digits = 0) {
-  // מספר יפה (כולל מחרוזות מספר)
   const x = Number(v);
   if (Number.isFinite(x)) return x.toFixed(digits);
   return v ?? "—";
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function pickBadge(desc, tempNow) {
+  const t = Number(tempNow);
+  const d = (desc || "").toLowerCase();
+  if (d.includes("גשם") || d.includes("rain")) return "מטריה מומלצת ☔";
+  if (d.includes("קרה") || d.includes("frost") || (Number.isFinite(t) && t <= 6))
+    return "קר במיוחד 🥶";
+  if (d.includes("שמש") || d.includes("sun")) return "יש שמש ☀️";
+  return "עדכון יומי";
+}
+
+/**
+ * גריד יציב למיילים (במקום flex) - 2 כרטיסים בשורה
+ * זה מונע “בריחה” של ריבועים מחוץ לתבנית ב-Gmail/Outlook.
+ */
+function metricGrid(items) {
+  const rows = [];
+  for (let i = 0; i < items.length; i += 2) {
+    const a = items[i];
+    const b = items[i + 1];
+
+    rows.push(`
+      <tr>
+        ${metricTd(a)}
+        ${b ? metricTd(b) : `<td style="width:50%;padding:6px;"></td>`}
+      </tr>
+    `);
+  }
+
+  return `
+    <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+      style="width:100%;border-collapse:separate;border-spacing:12px 12px;margin-top:4px;">
+      ${rows.join("")}
+    </table>
+  `;
+}
+
+function metricTd(item) {
+  const [icon, label, value] = item;
+  return `
+    <td style="width:50%;padding:0;vertical-align:top;">
+      <div style="background:#f9fafb;border:1px solid #eef2f7;border-radius:14px;padding:12px;box-sizing:border-box;width:100%;">
+        <div style="font-family:Arial,sans-serif;font-size:12px;color:#6b7280;direction:rtl">
+          <span style="font-size:14px">${escapeHtml(icon)}</span> ${escapeHtml(label)}
+        </div>
+        <div style="font-family:Arial,sans-serif;font-size:16px;font-weight:700;margin-top:6px;color:#111827;direction:rtl">
+          ${escapeHtml(value)}
+        </div>
+      </div>
+    </td>
+  `;
 }
 
 function buildHtml({ cityName, now, forecast }) {
   const nowObj = mergeKeyValueArray(now);
 
   const title = `תחזית מזג אוויר — ${cityName}`;
+  // ⚠️ נשאר בדיוק כמו שביקשת — לא משנים את הטקסט שמגיע מהאתר
   const desc = forecast?.lang1 || forecast?.lang0 || "—";
   const dateLine = `${forecast?.day_name ?? ""} ${forecast?.date ?? ""}`.trim();
 
@@ -56,9 +120,11 @@ function buildHtml({ cityName, now, forecast }) {
   return `
   <div style="margin:0;padding:0;background:#f6f7fb;">
     <div style="max-width:640px;margin:0 auto;padding:20px;">
-      
+
       <div style="background:#111827;color:#fff;border-radius:16px;padding:18px 18px 14px;">
-        <div style="font-family:Arial,sans-serif;font-size:18px;font-weight:700;direction:rtl">${escapeHtml(title)}</div>
+        <div style="font-family:Arial,sans-serif;font-size:18px;font-weight:700;direction:rtl">${escapeHtml(
+          title
+        )}</div>
         <div style="font-family:Arial,sans-serif;font-size:13px;opacity:.85;margin-top:6px;direction:rtl">
           ${escapeHtml(dateLine)} · עודכן ${escapeHtml(nowObj.time ?? "")}
         </div>
@@ -72,17 +138,17 @@ function buildHtml({ cityName, now, forecast }) {
       <div style="background:#fff;border-radius:16px;padding:16px;border:1px solid #e5e7eb;">
         <div style="font-family:Arial,sans-serif;font-size:14px;font-weight:700;direction:rtl">עכשיו</div>
 
-        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;">
-          ${metricCard("🌡️", "טמפרטורה", `${tempNow}°C`)}
-          ${metricCard("💧", "לחות", `${humNow}%`)}
-          ${metricCard("🧭", "רוח", `${escapeHtml(windDir)} · ${windSpd} קמ״ש`)}
-          ${metricCard("🧱", "לחץ", `${pressure} hPa`)}
-          ${metricCard("🌧️", "גשם היום", `${rainToday} מ״מ`)}
-          ${metricCard("☀️", "שעות שמש", `${sunshine}`)}
-        </div>
+        ${metricGrid([
+          ["🌡️", "טמפרטורה", `${tempNow}°C`],
+          ["💧", "לחות", `${humNow}%`],
+          ["🧭", "רוח", `${windDir} · ${windSpd} קמ״ש`],
+          ["🧱", "לחץ", `${pressure} hPa`],
+          ["🌧️", "גשם היום", `${rainToday} מ״מ`],
+          ["☀️", "שעות שמש", `${sunshine}`],
+        ])}
 
-        <div style="margin-top:10px;font-family:Arial,sans-serif;font-size:12px;color:#6b7280;direction:rtl">
-          סיכוי גשם: ${rainChance}%
+        <div style="margin-top:6px;font-family:Arial,sans-serif;font-size:12px;color:#6b7280;direction:rtl">
+          סיכוי גשם: ${escapeHtml(rainChance)}%
         </div>
       </div>
 
@@ -95,12 +161,12 @@ function buildHtml({ cityName, now, forecast }) {
           ${escapeHtml(desc)}
         </div>
 
-        <div style="margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;">
-          ${metricCard("⬇️", "מינ׳", `${low}°C`)}
-          ${metricCard("⬆️", "מקס׳", `${high}°C`)}
-          ${metricCard("🌙", "לילה", `${night}°C`)}
-          ${metricCard("💦", "לחות יום", `${humDay}%`)}
-        </div>
+        ${metricGrid([
+          ["⬇️", "מינ׳", `${low}°C`],
+          ["⬆️", "מקס׳", `${high}°C`],
+          ["🌙", "לילה", `${night}°C`],
+          ["💦", "לחות יום", `${humDay}%`],
+        ])}
       </div>
 
       <div style="height:12px"></div>
@@ -112,39 +178,6 @@ function buildHtml({ cityName, now, forecast }) {
   </div>`;
 }
 
-function metricCard(icon, label, value) {
-  return `
-    <div style="flex:1;min-width:140px;background:#f9fafb;border:1px solid #eef2f7;border-radius:14px;padding:12px;">
-      <div style="font-family:Arial,sans-serif;font-size:12px;color:#6b7280;direction:rtl">
-        <span style="font-size:14px">${icon}</span> ${escapeHtml(label)}
-      </div>
-      <div style="font-family:Arial,sans-serif;font-size:16px;font-weight:700;margin-top:6px;color:#111827;direction:rtl">
-        ${escapeHtml(value)}
-      </div>
-    </div>
-  `;
-}
-
-function pickBadge(desc, tempNow) {
-  const t = Number(tempNow);
-  const d = (desc || "").toLowerCase();
-  if (d.includes("גשם") || d.includes("rain")) return "מטריה מומלצת ☔";
-  if (d.includes("קרה") || d.includes("frost") || (Number.isFinite(t) && t <= 6)) return "קר במיוחד 🥶";
-  if (d.includes("שמש") || d.includes("sun")) return "יש שמש ☀️";
-  return "עדכון יומי";
-}
-
-// אם תרצה “יפה” יותר (מינ/מקס/רוח/גשם), אחרי שתריץ פעם אחת ותדביק לי דוגמת JSON,
-// נסדר parsing מדויק לשדות.
-function escapeHtml(s) {
-  return String(s)
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#039;");
-}
-
 async function sendEmail({ to, subject, html }) {
   const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
@@ -152,15 +185,15 @@ async function sendEmail({ to, subject, html }) {
     secure: String(process.env.SMTP_SECURE || "false") === "true",
     auth: {
       user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS
-    }
+      pass: process.env.SMTP_PASS,
+    },
   });
 
   await transporter.sendMail({
     from: process.env.FROM_EMAIL,
     to,
     subject,
-    html
+    html,
   });
 }
 
@@ -170,7 +203,7 @@ async function main() {
   for (const u of users) {
     const [now, forecast] = await Promise.all([
       fetchJson(u.nowUrl),
-      fetchJson(u.forecastUrl)
+      fetchJson(u.forecastUrl),
     ]);
 
     const subject = `תחזית — ${u.cityName}`;
